@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { connectDB } from './config/database';
 import { AuthController } from './controllers/AuthController';
+import { ImageController } from './services/ImageService';
 
 // Configuración
 dotenv.config();
@@ -17,6 +18,7 @@ connectDB();
 const router = express.Router();
 router.post('/auth/register', AuthController.register);
 router.post('/auth/login', AuthController.login);
+router.post('/images/', ImageController.processRequest);
 
 app.use('/api', router);
 
