@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import sharp, {Sharp} from 'sharp';
 
-// TODO: Implementar logger real
 interface Logger {
     log(message: string): void;
 }
@@ -78,13 +77,18 @@ class ResizeOperation extends ImageOperation {
 class CropOperation extends ImageOperation {
     async execute(): Promise<Sharp> {
         let image = await this.getInput();
+        let position;
         try {
+            if (!this.parameters.position) {
+                position = 'center';
+            } else {
+                position = this.parameters.position;
+            }
             return image
                 .resize(
                     this.parameters.width || null,
                     this.parameters.height || null,
-                    { fit: 'cover', position: 'centre' }
-                    // TODO: ( left, top ) Reqs?
+                    { fit: 'cover', position: position}
                 );        
         } catch (error) {
             this.log(`Error: ${error}`);
