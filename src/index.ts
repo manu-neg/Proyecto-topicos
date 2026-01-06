@@ -18,8 +18,11 @@ connectDB();
 const router = express.Router();
 router.post('/auth/register', AuthController.register);
 router.post('/auth/login', AuthController.login);
-router.post('/images/', ImageController.processRequest);
-
+router.post('/images/resize', ImageController.processResize);
+router.post('/images/crop', ImageController.processCrop);
+router.post('/images/rotate', ImageController.processRotate);
+router.post('/images/filter', ImageController.processFilter);
+router.post('/images/pipeline', ImageController.processRequestPipeline);
 app.use('/api', router);
 
 const PORT = process.env.PORT || 3000;

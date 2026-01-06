@@ -36,7 +36,7 @@ class ImageOperation implements IImageOperation {
     }
 
     async run(): Promise<Sharp> {
-        this.log('Starting operation');
+        this.log(`Starting operation with parameters ${JSON.stringify(this.parameters)}`);
         const result = await this.execute();
         this.log('Finished operation');
         return result;
@@ -290,18 +290,51 @@ class ImageLogger implements Logger {
 
 class ImageController {
 
+    static processSimpleRequest(type: string): (req: Request, res: Response) => void {
+        const logger = ImageLogger.getInstance();
+        const log = logger.log;
+        log(`Processing simple request of type: ${type}`);
+        
+        return async (req: Request, res: Response): Promise<void> => {
+            log('Processing image request at generated closure');
+            let imageDecoded: Buffer = Buffer.from(req.body.image, 'base64');
+
+            if (!imageDecoded || !SUPPORTED_OPERATIONS.has(type) || !req.body.params) {
+                log('Invalid request data');
+                res.status(400).json({ message: 'Bad Request' });
+                return;
+            } else {
+
+                log('Creating operation object');
+                let object: Request = {
+                    body: {
+                        type: type,
+                        params: req.body.params,
+                        image: imageDecoded
+                    }
+                } as Request;
+                ImageController.processRequestPipeline(object, res)
+                
+            }
+        }
+    }
+
+    static processResize = ImageController.processSimpleRequest('resize');
+    static processCrop = ImageController.processSimpleRequest('crop');
+    static processRotate = ImageController.processSimpleRequest('rotate');
+    static processFilter = ImageController.processSimpleRequest('filter');
+
     static parseRequestBody(req: Request): [Record<string, any>, Buffer] {
         const logger = ImageLogger.getInstance();
         const log = logger.log;
         log('Parsing request body');
         const body = req.body;
 
-        if (body.request && body.image) {
-            const operation = body.request;
+        if (body && body.image) {
             const imageBase64: string = body.image;
             const imageBuffer: Buffer = Buffer.from(imageBase64, 'base64');
             log('Request body parsed successfully');
-            return [operation, imageBuffer];
+            return [body, imageBuffer];
         } else {
             log('Invalid request body format');
             throw new Error('Invalid request body format');
@@ -309,7 +342,7 @@ class ImageController {
 
     }
 
-    static async processRequest(req: Request, res: Response): Promise<void> {
+    static async processRequestPipeline(req: Request, res: Response): Promise<void> {
         const logger = ImageLogger.getInstance();
         const log = logger.log;
         log('Processing image request');
@@ -348,7 +381,6 @@ class ImageController {
             return;
         }
 
-        log(`Received operation: ${JSON.stringify(operation)}`);
 
         const imageService = ImageService.getInstance(new ImageOperationFactory(logger), logger);
         
