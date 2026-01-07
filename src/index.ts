@@ -17,6 +17,13 @@ app.use(cors({
 // Conectar Base de Datos
 connectDB();
 
+// TODO: reemplazar esta funcion con la validacion de tokens real
+const validationFn = (req: express.Request): boolean => {
+  let va: boolean = true;
+  console.log("validation: ", va);
+  return va;
+};
+
 // Rutas (Definirlas aquí directo para ir rápido por ahora)
 const router = express.Router();
 // Rutas Publicas (De autenticación)

@@ -294,7 +294,7 @@ class ImageLogger implements Logger {
 
 class ImageController {
 
-    static processSimpleRequest(type: string): (req: Request, res: Response) => void {
+    static processSimpleRequest(type: string): (req: Request, res: Response) => Promise<void> {
         const logger = ImageLogger.getInstance();
         const log = logger.log;
         log(`Processing simple request of type: ${type}`);
@@ -317,7 +317,7 @@ class ImageController {
                         image: imageDecoded
                     }
                 } as Request;
-                ImageController.processRequestPipeline(object, res)
+                await ImageController.processRequestPipeline(object, res);
                 
             }
         }
