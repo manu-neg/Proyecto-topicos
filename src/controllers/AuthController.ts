@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
+import { ILogger, LogEntry } from '../types';
+import { Timestamp } from '../logging/concreteLogger';
 
 export class AuthController {
   
@@ -57,4 +59,26 @@ export class AuthController {
       res.status(500).json({ message: 'Error en el servidor', error });
     }
   }
+}
+type Logger = { log(message: string): void };
+export class AuthLogger implements Logger {
+    private constructor(private readonly logger: ILogger) {}
+    static getInstance(base: (ILogger)): AuthLogger {
+        return new AuthLogger(base);
+    }
+    log(message: string): void {
+        this.logger.log(this.generateLogEntry(message));
+    }
+    generateLogEntry(message: string): Timestamp {
+        return new Timestamp(
+            new Date().toISOString(),
+            'info',
+            'system',
+            'auth-service',
+            {},
+            0,
+            'success',
+            message
+        );
+    }
 }

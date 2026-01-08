@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
 import sharp, {Sharp} from 'sharp';
+import { ILogger } from '../types';
+import { Timestamp } from '../logging/concreteLogger';
 
-interface Logger {
-    log(message: string): void;
-}
 
 
 interface IImageOperation {
@@ -282,21 +281,46 @@ class ImageService implements TImageService<Buffer> {
 
 }
 
+interface Logger {
+    log(message: string): void;
+}
+
 class ImageLogger implements Logger {
-    private constructor() {}
-    static getInstance(): ImageLogger {
-        return new ImageLogger();
+    static instance: ImageLogger;
+    private constructor(protected logger: ILogger) {}
+    static getInstance(base: (ILogger)): ImageLogger {
+        if (!ImageLogger.instance) {
+            ImageLogger.instance = new ImageLogger(base);
+        }
+        return ImageLogger.instance;
     }
-    log(message: string): void {
-        console.log(`[+]\t${message}`);
+
+    async log(message: string): Promise<void> {
+        await this.logger.log(this.generateLogEntry(message));
+    }
+
+    generateLogEntry(message: string): Timestamp {
+        return new Timestamp(
+            new Date().toISOString(),
+            'info',
+            'system',
+            'image-service',
+            {},
+            0,
+            'success',
+            message
+        );
     }
 }
 
 class ImageController {
 
-    static processSimpleRequest(type: string): (req: Request, res: Response) => Promise<void> {
-        const logger = ImageLogger.getInstance();
-        const log = logger.log;
+    static processSimpleRequest(type: string, loggingInstance: ILogger): (req: Request, res: Response) => Promise<void> {
+        
+        const instance: Logger = ImageLogger.getInstance(loggingInstance);
+        const log: (message: string) => void = (message: string) => {
+            Promise.resolve(instance.log(message));
+        };
         log(`Processing simple request of type: ${type}`);
         
         return async (req: Request, res: Response): Promise<void> => {
@@ -317,20 +341,20 @@ class ImageController {
                         image: imageDecoded
                     }
                 } as Request;
-                await ImageController.processRequestPipeline(object, res);
+                await ImageController.processRequestPipeline(object, res, loggingInstance);
                 
             }
         }
     }
 
-    static processResize = ImageController.processSimpleRequest('resize');
-    static processCrop = ImageController.processSimpleRequest('crop');
-    static processRotate = ImageController.processSimpleRequest('rotate');
-    static processFilter = ImageController.processSimpleRequest('filter');
+    static processResize = (loggingInstance: ILogger) => ImageController.processSimpleRequest('resize', loggingInstance);
+    static processCrop = (loggingInstance: ILogger) => ImageController.processSimpleRequest('crop', loggingInstance);
+    static processRotate = (loggingInstance: ILogger) => ImageController.processSimpleRequest('rotate', loggingInstance);
+    static processFilter = (loggingInstance: ILogger) => ImageController.processSimpleRequest('filter', loggingInstance);
+    static processPipeline = (loggingInstance: ILogger) => async (req: Request, res: Response): Promise<void> => ImageController.processRequestPipeline(req, res, loggingInstance);
 
-    static parseRequestBody(req: Request): [Record<string, any>, Buffer] {
-        const logger = ImageLogger.getInstance();
-        const log = logger.log;
+    static parseRequestBody(req: Request, logger: Logger): [Record<string, any>, Buffer] {
+        const log = (message: string) => { Promise.resolve(logger.log(message)); };
         log('Parsing request body');
         const body = req.body;
 
@@ -346,9 +370,9 @@ class ImageController {
 
     }
 
-    static async processRequestPipeline(req: Request, res: Response): Promise<void> {
-        const logger = ImageLogger.getInstance();
-        const log = logger.log;
+    static async processRequestPipeline(req: Request, res: Response, loggingInstance: ILogger): Promise<void> {
+        const logger = ImageLogger.getInstance(loggingInstance);
+        const log = (message: string) => { Promise.resolve(logger.log(message)); };
         log('Processing image request');
 
 
@@ -378,7 +402,7 @@ class ImageController {
         let operation: Record<string, any>;
         let image: Buffer;
         try {
-            [operation, image] = ImageController.parseRequestBody(req);
+            [operation, image] = ImageController.parseRequestBody(req, logger);
         } catch (error) {
             log(`Error parsing request body: ${error}`);
             res.status(400).json({ message: 'Bad Request' });

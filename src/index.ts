@@ -4,12 +4,9 @@ import cors from 'cors';
 import { connectDB } from './config/database';
 import { AuthController } from './controllers/AuthController';
 import { ImageController } from './services/ImageService';
+import AuthEndpointValidator from './controllers/AuthEndpointValidator';
+import { ConcreteLogger } from './logging/concreteLogger';
 import { verifyToken } from './middlewares/AuthMiddleware';
-import { AuthDecorator } from './decorators/AuthDecorator';
-import { LoggingDecorator } from './decorators/LoggingDecorator';
-import { FileLogger } from './logging/FileLogger';
-import { IImageHandler } from './types';
-
 
 // Configuración
 dotenv.config();
@@ -19,43 +16,17 @@ app.use(cors({
   origin: '*',
 }));
 
+export interface Logger {
+    log(message: string): void;
+}
+
 // Conectar Base de Datos
 connectDB();
 
 //Instancias
-const logger = new FileLogger();
+const logger: ConcreteLogger = new ConcreteLogger();
 
-const pipelineHandler: IImageHandler = new LoggingDecorator(
-  new AuthDecorator({ handle: ImageController.processRequestPipeline }),
-  logger
-);
-
-const resizeHandler: IImageHandler = new LoggingDecorator(
-  new AuthDecorator({ handle: ImageController.processResize }),
-  logger
-);
-
-const cropHandler: IImageHandler = new LoggingDecorator(
-  new AuthDecorator({ handle: ImageController.processCrop }),
-  logger
-);
-
-const rotateHandler: IImageHandler = new LoggingDecorator(
-  new AuthDecorator({ handle: ImageController.processRotate }),
-  logger
-);
-
-const filterHandler: IImageHandler = new LoggingDecorator(
-  new AuthDecorator({ handle: ImageController.processFilter }),
-  logger
-);
-
-// TODO: reemplazar esta funcion con la validacion de tokens real
-const validationFn = (req: express.Request): boolean => {
-  let va: boolean = true;
-  console.log("validation: ", va);
-  return va;
-};
+const validationFn = verifyToken;
 
 // Rutas (Definirlas aquí directo para ir rápido por ahora)
 const router = express.Router();
@@ -65,20 +36,11 @@ router.post('/auth/login', AuthController.login);
 
 // Rutas Privadas (Disponibles despues de autenticas)
 
-/*
-router.post('/images/pipeline', verifyToken, ImageController.processRequestPipeline);
-router.post('/images/resize', verifyToken, ImageController.processResize);
-router.post('/images/crop', verifyToken, ImageController.processCrop);
-router.post('/images/rotate', verifyToken, ImageController.processRotate);
-router.post('/images/filter', verifyToken, ImageController.processFilter);
-*/
-
-router.post('/images/pipeline', (req, res) => pipelineHandler.handle(req, res));
-router.post('/images/resize', (req, res) => resizeHandler.handle(req, res));
-router.post('/images/crop', (req, res) => cropHandler.handle(req, res));
-router.post('/images/rotate', (req, res) => rotateHandler.handle(req, res));
-router.post('/images/filter', (req, res) => filterHandler.handle(req, res));
-
+router.post('/images/resize', AuthEndpointValidator.bind(ImageController.processResize, validationFn, logger));
+router.post('/images/crop', AuthEndpointValidator.bind(ImageController.processCrop, validationFn, logger));
+router.post('/images/rotate', AuthEndpointValidator.bind(ImageController.processRotate, validationFn, logger));
+router.post('/images/filter', AuthEndpointValidator.bind(ImageController.processFilter, validationFn, logger));
+router.post('/images/pipeline', AuthEndpointValidator.bind(ImageController.processPipeline, validationFn, logger));
 
 app.use('/api', router);
 
