@@ -325,7 +325,19 @@ class ImageController {
         
         return async (req: Request, res: Response): Promise<void> => {
             log('Processing image request at generated closure');
+            if (!req.body || !req.body.image) {
+                log('Invalid request data');
+                res.status(400).json({ message: 'Bad Request' });
+                return;
+            }
+
             let imageDecoded: Buffer = Buffer.from(req.body.image, 'base64');
+            const MAX_BYTES = 10 * 1024 * 1024; // 10MB
+            if (imageDecoded.length > MAX_BYTES) {
+                log(`Image exceeds maximum allowed size: ${imageDecoded.length} bytes`);
+                res.status(413).json({ message: 'Image too large' });
+                return;
+            }
 
             if (!imageDecoded || !SUPPORTED_OPERATIONS.has(type) || !req.body.params) {
                 log('Invalid request data');
